@@ -1,0 +1,259 @@
+#!/bin/sh -e
+
+VERSION=0.1
+
+PATH=$PATH:libshell
+. shell-error
+. shell-getopt
+
+#
+# Probably need to be configurable in future
+#
+
+host_oi_components=host-tools
+host_oi_packages="dpkg-cross slind-control debian-backports-keyring"
+host_oi_backports_packages="git-core"
+
+# ---
+
+# Our little config.guess
+guess_hostarch() {
+    if [ $(uname -s) != "Linux" ]; then
+        echo unknown
+        return
+    fi
+    case "$(uname -m)" in
+        i?86|pentium*) echo i386;;
+        x86_64)        echo amd64;;
+        *)             echo unknown;;
+    esac
+}
+
+hostarch() {
+    dpkg --print-architecture 2>/dev/null || guess_hostarch
+}
+
+generate_chroot() {
+    $root_cmd $chroot_env debootstrap/debootstrap --arch=$chroot_arch etch $work_dir $debian_mirror
+    if [ "$?" != 0 ]; then
+        echo "Failed to bootstrap etch from $debian_mirror to $work_dir"
+        exit 1
+    fi
+
+    # -- hostname --
+
+    echo "127.0.0.1 localhost "$(hostname) | $root_sh "cat >> $work_dir/etc/hosts"
+
+    # -- proxies --
+
+    if [ -n "$http_proxy" ]; then
+        echo "http_proxy=$http_proxy
+export http_proxy" | $root_sh "cat > $work_dir/etc/profile"
+        echo "Acquire::http::Proxy \"$http_proxy\";" | $root_sh "cat >> $work_dir/etc/apt/apt.conf"
+    fi
+    if [ -n "$ftp_proxy" ]; then
+        echo "ftp_proxy=$ftp_proxy
+export ftp_proxy" | $root_sh "cat > $work_dir/etc/profile"
+        echo "Acquire::ftp::Proxy \"$ftp_proxy\";" | $root_sh "cat >> $work_dir/etc/apt/apt.conf"
+    fi
+
+    # -- $work_dir/enter --
+
+    echo "#!/bin/sh
+$root_cmd $chroot_cmd $work_dir su - build" | $root_sh "cat > $work_dir/enter"
+    $root_cmd chmod +x $work_dir/enter
+
+    # -- sources.list --
+
+    TMPFILE=$(mktemp)
+    echo "deb $debian_mirror etch main" > $TMPFILE
+    # FIXME
+    echo "deb http://www.backports.org/debian etch-backports main" >> $TMPFILE
+    echo "deb $openinkpot_mirror $openinkpot_suite $host_oi_components" >> $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
+
+    # -- 'build' user --
+
+    [ -n "$UID" ] || UID=`id -u`
+
+    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'OpenInkpot build user' build
+    $root_cmd $chroot_cmd $work_dir sh -c "echo 'build ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"
+}
+
+populate_chroot() {
+    $root_cmd $chroot_cmd $work_dir apt-get update
+    $root_cmd $chroot_cmd $work_dir apt-get dist-upgrade --yes --force-yes
+    $root_cmd $chroot_cmd $work_dir apt-get install --yes --force-yes $host_oi_packages
+    $root_cmd $chroot_cmd $work_dir apt-get install --yes --force-yes -t etch-backports $host_oi_backports_packages
+}
+
+configure_chroot() {
+    echo "SUITE=$openinkpot_suite
+REPO=$openinkpot_mirror
+ROOT_CMD=sudo" | $root_cmd $chroot_cmd $work_dir sh -c "cat > /etc/cross-shell/config"
+}
+
+bootstrap_host() {
+    $root_cmd $chroot_cmd $work_dir su - build -c sc-bootstrap-host
+}
+
+bootstrap_target() {
+    $root_cmd $chroot_cmd $work_dir su - build -c "sc-bootstrap-target $1"
+}
+
+hint_chroot() {
+    echo
+    echo
+    echo "You can enter newly created OpenInkpot build environment by issuing"
+    echo "the following command:"
+    echo
+    echo -n "    "
+    cat $work_dir/enter | grep -v '#!/bin/sh'
+    echo
+    echo "For your convenience, file"
+    echo "    $work_dir/enter"
+    echo "is created, doing the same thing."
+}
+
+usage() {
+    echo "Usage: ${0##*/} [OPTION]... <target-dir>"
+    echo "Bootstrap OpenInkpot build system"
+    echo
+    cat <<EOF
+      -h|--help             display this help and exit
+      -V|--version          display version information and exit
+      -v|--verbose          don't turn off the output of tools
+
+      --http-proxy=P        use proxy to obtain packages and
+      --ftp-proxy=P         in build system created
+
+      --debian-mirror=U     debian mirror to use. this should be
+                            an URL understandable by debootstrap
+                            (defaults to '$debian_mirror')
+      --openinkpot-mirror=U openinkpot mirror to use
+                            (defaults to '$openinkpot_mirror')
+      --openinkpot-suite=S  openinkpot suite to use
+                            (defaults to '$openinkpot_suite')
+      --target-archs=A,B... target architectures (defaults to '$target_archs')
+
+      --root-cmd=C          command to gain root (defaults to '$root_cmd')
+
+EOF
+}
+
+export LC_ALL=C
+	
+TMP=$(getopt --long help,version,verbose,http-proxy:,ftp-proxy:,debian-mirror:,openinkpot-mirror:,openinkpot-suite:,root:,target-archs:,no-bootstrap-rootfs,root-cmd: -o hvV -- "$@")
+
+if [ $? != 0 ]; then
+    exit 1
+fi
+
+eval set -- "$TMP"
+
+debian_mirror=http://ftp.de.debian.org/debian/
+openinkpot_mirror=http://openinkpot.org/pub/oi/
+openinkpot_suite=asimov
+root_cmd=sudo
+chroot_env=
+target_archs=armel
+
+while true; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -V|--version)
+            echo "oi-bootstrap $VERSION"
+            exit 0
+            ;;
+        -v|--verbose)
+            verbose=true
+            export verbose
+            shift
+            ;;
+        --http-proxy)
+            http_proxy="$2"
+            chroot_env="$chroot_env http_proxy=$2"
+            shift 2
+            ;;
+        --ftp-proxy)
+            ftp_proxy="$2"
+            chroot_env="$chroot_env ftp_proxy=$2"
+            shift 2
+            ;;
+        --debian-mirror)
+            debian_mirror="$2"
+            shift 2
+            ;;
+        --openinkpot-mirror)
+            openinkpot_mirror="$2"
+            shift 2
+            ;;
+        --openinkpot-suite)
+            openinkpot_suite="$2"
+            shift 2
+            ;;
+        --target-archs)
+            target_archs="$2"
+            shift 2
+            ;;
+        --no-bootstrap-rootfs)
+            no_bootstrap_rootfs=1
+            shift
+            ;;
+        --root-cmd)
+            root_cmd="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            echo "Unexpected argument in arguments list: $1"
+            exit 1
+            ;;
+    esac
+done
+
+if [ $# != 1 ]; then
+    usage
+    exit 0
+fi
+
+case "$1" in
+    /*) work_dir="$1";;
+    *)  work_dir=$(pwd)/$1;;
+esac
+
+root_sh="$root_cmd sh -c"
+
+case "$(hostarch)" in
+    i386)
+        chroot_cmd="chroot"
+        chroot_arch=i386
+        ;;
+    amd64)
+        chroot_cmd="linux32 chroot"
+        chroot_arch=i386
+        ;;
+    *)
+        echo "Unable to determine host architecture. Please file a bug report with output of"
+        echo "* dpkg --print-architecture (if you use Debian-based system)"
+        echo "* uname -s; uname -m (in all other cases)"
+        exit 1
+esac
+
+generate_chroot
+populate_chroot
+configure_chroot
+if [ -z "$no_bootstrap_rootfs" ]; then
+    bootstrap_host
+    for arch in $target_archs; do
+        bootstrap_target $arch
+    done
+fi
+
+hint_chroot

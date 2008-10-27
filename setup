@@ -1,0 +1,26 @@
+#!/bin/sh -e
+
+echo -n "Updating 'enter': "
+
+echo "#!/bin/sh
+sudo chroot $(pwd) su - build" | sudo sh -c "cat > enter"
+
+echo "ok"
+
+echo -n "Changing 'build' UID to $UID: "
+
+sudo chroot . sh -c "sed -ie s/build:x:1000/build:x:$UID/ /etc/passwd"
+sudo chroot . sh -c "find / -user 1000 -print0 | xargs -0 chown build"
+
+echo "ok"
+
+echo -n "Copying resolv.conf to chroot: "
+
+sudo chroot . sh -c "cat > /etc/resolv.conf" < /etc/resolv.conf
+
+echo "ok"
+echo
+
+echo "You might want to adapt repositories:"
+echo " Debian mirror: /etc/apt/sources.list"
+echo " OpenInkpot mirror: /etc/cross-shell/config"
