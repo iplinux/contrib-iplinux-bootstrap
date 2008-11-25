@@ -77,6 +77,7 @@ $root_cmd $chroot_cmd $work_dir su - build" | $root_sh "cat > $work_dir/enter"
     [ -n "$UID" ] || UID=`id -u`
 
     $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'OpenInkpot build user' build
+    $root_cmd $chroot_cmd $work_dir sh -c "echo 'Defaults env_keep+=http_proxy, env_keep+=ftp_proxy' >> /etc/sudoers"
     $root_cmd $chroot_cmd $work_dir sh -c "echo 'build ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"
 }
 
