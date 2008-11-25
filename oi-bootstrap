@@ -34,7 +34,7 @@ hostarch() {
 }
 
 generate_chroot() {
-    $root_cmd $chroot_env debootstrap/debootstrap --arch=$chroot_arch etch $work_dir $debian_mirror
+    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --arch=$chroot_arch etch $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
         echo "Failed to bootstrap etch from $debian_mirror to $work_dir"
         exit 1
