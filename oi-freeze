@@ -1,5 +1,8 @@
 #!/bin/sh -e
 
+echo "oi-freeze is broken in 0.2"
+exit 1
+
 D=$(date +%Y%m%d)
 DIR=oi-devenv-$(date +%Y%m%d)
 
