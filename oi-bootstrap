@@ -33,35 +33,50 @@ hostarch() {
     dpkg --print-architecture 2>/dev/null || guess_hostarch
 }
 
+#
+# Bootstraps chroot and performs configuration enough to run $work_dir/enter
+#
 generate_chroot() {
-    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --arch=$chroot_arch etch $work_dir $debian_mirror"
+    echo "== Generating chroot (1/5) =="
+    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch etch $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
         echo "Failed to bootstrap etch from $debian_mirror to $work_dir"
         exit 1
     fi
 
-    # -- hostname --
+    # -- hostname (for sudo) --
 
-    echo "127.0.0.1 localhost "$(hostname) | $root_sh "cat >> $work_dir/etc/hosts"
+    HOSTNAME=$(hostname)
+    $root_sh "echo 127.0.0.1 localhost $HOSTNAME >> $work_dir/etc/hosts"
 
-    # -- proxies --
+    # -- 'build' user --
 
-    if [ -n "$http_proxy" ]; then
-        echo "http_proxy=$http_proxy
-export http_proxy" | $root_sh "cat > $work_dir/etc/profile"
-        echo "Acquire::http::Proxy \"$http_proxy\";" | $root_sh "cat >> $work_dir/etc/apt/apt.conf"
-    fi
-    if [ -n "$ftp_proxy" ]; then
-        echo "ftp_proxy=$ftp_proxy
-export ftp_proxy" | $root_sh "cat > $work_dir/etc/profile"
-        echo "Acquire::ftp::Proxy \"$ftp_proxy\";" | $root_sh "cat >> $work_dir/etc/apt/apt.conf"
-    fi
+    [ -n "$UID" ] || UID=`id -u`
+
+    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'OpenInkpot build user' build
+
+    # -- sudo --
+
+    TMPFILE=$(mktemp)
+    echo "Defaults env_keep+=http_proxy, env_keep+=ftp_proxy" > $TMPFILE
+    echo "build ALL=(ALL) NOPASSWD:ALL" >> $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/etc/sudoers
+    $root_cmd chown root:root $work_dir/etc/sudoers
+    $root_cmd chmod 440 $work_dir/etc/sudoers
 
     # -- $work_dir/enter --
 
-    echo "#!/bin/sh
-$root_cmd $chroot_cmd $work_dir su - build" | $root_sh "cat > $work_dir/enter"
+    TMPFILE=$(mktemp)
+    sed -e "s,@@CHROOT_PATH@@,$work_dir,g" \
+        -e "s,@@HTTP_PROXY@@,$http_proxy,g" \
+        -e "s,@@FTP_PROXY@@,$ftp_proxy,g" < enter.in > $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/enter
     $root_cmd chmod +x $work_dir/enter
+
+}
+
+populate_chroot() {
+    echo "== Populating chroot (2/5) =="
 
     # -- sources.list --
 
@@ -72,34 +87,35 @@ $root_cmd $chroot_cmd $work_dir su - build" | $root_sh "cat > $work_dir/enter"
     echo "deb $openinkpot_mirror $openinkpot_suite $host_oi_components" >> $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
 
-    # -- 'build' user --
+    # -- packages --
 
-    [ -n "$UID" ] || UID=`id -u`
-
-    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'OpenInkpot build user' build
-    $root_cmd $chroot_cmd $work_dir sh -c "echo 'Defaults env_keep+=http_proxy, env_keep+=ftp_proxy' >> /etc/sudoers"
-    $root_cmd $chroot_cmd $work_dir sh -c "echo 'build ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"
-}
-
-populate_chroot() {
-    $root_cmd $chroot_cmd $work_dir apt-get update
-    $root_cmd $chroot_cmd $work_dir apt-get dist-upgrade --yes --force-yes
-    $root_cmd $chroot_cmd $work_dir apt-get install --yes --force-yes $host_oi_packages
-    $root_cmd $chroot_cmd $work_dir apt-get install --yes --force-yes -t etch-backports $host_oi_backports_packages
+    $work_dir/enter sudo apt-get update
+    $work_dir/enter sudo apt-get dist-upgrade --yes --force-yes
+    $work_dir/enter sudo apt-get install --yes --force-yes $host_oi_packages
+    $work_dir/enter sudo apt-get install --yes --force-yes -t etch-backports $host_oi_backports_packages
 }
 
 configure_chroot() {
+    echo "== Configuring chroot (3/5) =="
+
+    TMPFILE=$(mktemp)
     echo "SUITE=$openinkpot_suite
 REPO=$openinkpot_mirror
-ROOT_CMD=sudo" | $root_cmd $chroot_cmd $work_dir sh -c "cat > /etc/cross-shell/config"
+ROOT_CMD=sudo"  > $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
 }
 
 bootstrap_host() {
-    $root_cmd $chroot_cmd $work_dir su - build -c sc-bootstrap-host
+    echo "== Bootstraping host (4/5) =="
+    $work_dir/enter sc-bootstrap-host
 }
 
 bootstrap_target() {
-    $root_cmd $chroot_cmd $work_dir su - build -c "sc-bootstrap-target $1"
+    echo "== Bootstrapping targets (5/5) =="
+    for arch in "$@"; do
+        echo "--> $arch"
+        $work_dir/enter sc-bootstrap-target $arch
+    done
 }
 
 hint_chroot() {
@@ -107,13 +123,9 @@ hint_chroot() {
     echo
     echo "You can enter newly created OpenInkpot build environment by issuing"
     echo "the following command:"
-    echo
-    echo -n "    "
-    cat $work_dir/enter | grep -v '#!/bin/sh'
-    echo
-    echo "For your convenience, file"
     echo "    $work_dir/enter"
-    echo "is created, doing the same thing."
+    echo
+    echo
 }
 
 usage() {
@@ -247,14 +259,25 @@ case "$(hostarch)" in
         exit 1
 esac
 
+trap check_ok 0
+check_ok() {
+    RET=$?
+    if [ $RET -ne 0 ]; then
+        echo "Chroot generation failed"
+    fi
+    exit $RET
+}
+
+echo
+echo "*** If script bails off without \"You can enter newly created...\", then it broke."
+echo
+
 generate_chroot
 populate_chroot
 configure_chroot
 if [ -z "$no_bootstrap_rootfs" ]; then
     bootstrap_host
-    for arch in $target_archs; do
-        bootstrap_target $arch
-    done
+    bootstrap_target $target_archs
 fi
 
 hint_chroot

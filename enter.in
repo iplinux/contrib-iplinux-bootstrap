@@ -1,0 +1,48 @@
+#!/bin/sh
+
+#
+# This script runs a shell inside chroot as a 'build' user.  If any arguments
+# supplied, those are the command to be run, otherwise the interactive shell
+# will be invoked.
+#
+
+CHROOT_PATH=@@CHROOT_PATH@@
+HTTP_PROXY=@@HTTP_PROXY@@
+FTP_PROXY=@@FTP_PROXY@@
+
+# Quote argument for shell.
+# Usage example: eval "$var_name=\"$(quote_shell "$var_value")\""
+quote_shell() {
+	local out="$*"
+	if [ -z "${out##*[\"\$\`\\\\]*}" ]; then
+		out="$(printf %s "$out" |sed -e 's/["$`\\]/\\&/g')" ||
+			return 1
+	fi
+	printf %s "$out"
+    #` # Hey, Emacs, your syntax highlighter is wrooong!
+}
+
+quote_args() {
+    for i in "$@"; do
+        echo -n \"$(quote_shell "$i")\"
+        echo -n " "
+    done
+    echo
+}
+
+if [ "$#" -eq 0 ]; then
+    SU_CMD=-i
+else
+    S=$(quote_args "$@")
+    QS=$(quote_args "$S")
+    SU_CMD="-c $QS"
+fi
+
+if [ -n "$HTTP_PROXY" ]; then
+    PROXY_EXPORT="http_proxy=$HTTP_PROXY; export http_proxy;"
+fi
+if [ -n "$FTP_PROXY" ]; then
+    PROXY_EXPORT="$PROXY_EXPORT ftp_proxy=$FTP_PROXY; export ftp_proxy;"
+fi
+
+exec sudo /usr/sbin/chroot "$CHROOT_PATH" su -l -c "$PROXY_EXPORT exec \$SHELL $SU_CMD" build
