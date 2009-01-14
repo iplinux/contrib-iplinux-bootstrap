@@ -1,6 +1,8 @@
 #!/bin/sh -e
 
-VERSION=0.2.1
+VERSION=0.3
+
+DISTRO=lenny
 
 PATH=$PATH:libshell
 . shell-error
@@ -10,9 +12,8 @@ PATH=$PATH:libshell
 # Probably need to be configurable in future
 #
 
-host_oi_components=host-tools
-host_oi_packages="dpkg-cross slind-control debian-backports-keyring"
-host_oi_backports_packages="git-core"
+host_inkpump_components=host/tools
+host_inkpump_packages="dpkg-cross slind-control"
 
 # ---
 
@@ -38,9 +39,9 @@ hostarch() {
 #
 generate_chroot() {
     echo "== Generating chroot (1/5) =="
-    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch etch $work_dir $debian_mirror"
+    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $DISTRO $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
-        echo "Failed to bootstrap etch from $debian_mirror to $work_dir"
+        echo "Failed to bootstrap $DISTRO from $debian_mirror to $work_dir"
         exit 1
     fi
 
@@ -53,7 +54,7 @@ generate_chroot() {
 
     [ -n "$UID" ] || UID=`id -u`
 
-    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'OpenInkpot build user' build
+    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'Inkpump build user' build
 
     # -- sudo --
 
