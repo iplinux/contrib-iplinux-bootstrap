@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-VERSION=0.2
+VERSION=0.2.1
 
 PATH=$PATH:libshell
 . shell-error
@@ -165,8 +165,8 @@ fi
 eval set -- "$TMP"
 
 debian_mirror=http://ftp.de.debian.org/debian/
-openinkpot_mirror=http://openinkpot.org/pub/oi/
-openinkpot_suite=asimov
+openinkpot_mirror=http://openinkpot.org/pub/SLIND/
+openinkpot_suite=clydesdale
 root_cmd=sudo
 chroot_env=
 target_archs=armel
