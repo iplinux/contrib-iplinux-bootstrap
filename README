@@ -1,12 +1,5 @@
-== oi-bootstrap ==
+== iplinux-bootstrap ==
 
-Usage: oi-bootstrap [OPTIONS] <dir>
+Usage: iplinux-bootstrap [OPTIONS] <dir>
 
-Creates new OpenInkpot devenv chroot.
-
-== oi-freeze ==
-
-Usage: oi-freeze [OPTIONS]
-
-Creates new OpenInkpot devenv chroot, prepares it for publishing and packages
-into a tarball.
+Creates new IPlinux devenv chroot.

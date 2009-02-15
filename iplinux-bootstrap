@@ -2,7 +2,9 @@
 
 VERSION=0.3
 
-DISTRO=lenny
+DEBIAN_SUITE=lenny
+
+GPG_KEY=http://ftp.iplinux.org/gpgkey
 
 PATH=$PATH:libshell
 . shell-error
@@ -12,8 +14,8 @@ PATH=$PATH:libshell
 # Probably need to be configurable in future
 #
 
-host_inkpump_components=host/tools
-host_inkpump_packages="dpkg-cross slind-control"
+host_components="host/tools host/cross"
+host_packages="dpkg-cross slind-control"
 
 # ---
 
@@ -39,9 +41,9 @@ hostarch() {
 #
 generate_chroot() {
     echo "== Generating chroot (1/5) =="
-    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $DISTRO $work_dir $debian_mirror"
+    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $DEBIAN_SUITE $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
-        echo "Failed to bootstrap $DISTRO from $debian_mirror to $work_dir"
+        echo "Failed to bootstrap $DEBIAN_SUITE from $debian_mirror to $work_dir"
         exit 1
     fi
 
@@ -54,7 +56,7 @@ generate_chroot() {
 
     [ -n "$UID" ] || UID=`id -u`
 
-    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'Inkpump build user' build
+    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'IPlinux build user' build
 
     # -- sudo --
 
@@ -82,26 +84,27 @@ populate_chroot() {
     # -- sources.list --
 
     TMPFILE=$(mktemp)
-    echo "deb $debian_mirror etch main" > $TMPFILE
-    # FIXME
-    echo "deb http://www.backports.org/debian etch-backports main" >> $TMPFILE
-    echo "deb $openinkpot_mirror $openinkpot_suite $host_oi_components" >> $TMPFILE
+    echo "deb $debian_mirror $DEBIAN_SUITE main" > $TMPFILE
+    echo "deb $mirror $suite $host_components" >> $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
+
+    # -- GPG key --
+
+    $work_dir/enter sh -c "wget -O- $GPG_KEY | sudo apt-key add -"
 
     # -- packages --
 
     $work_dir/enter sudo apt-get update
     $work_dir/enter sudo apt-get dist-upgrade --yes --force-yes
-    $work_dir/enter sudo apt-get install --yes --force-yes $host_oi_packages
-    $work_dir/enter sudo apt-get install --yes --force-yes -t etch-backports $host_oi_backports_packages
+    $work_dir/enter sudo apt-get install --yes --force-yes $host_packages
 }
 
 configure_chroot() {
     echo "== Configuring chroot (3/5) =="
 
     TMPFILE=$(mktemp)
-    echo "SUITE=$openinkpot_suite
-REPO=$openinkpot_mirror
+    echo "SUITE=$suite
+REPO=$mirror
 ROOT_CMD=sudo"  > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
 }
@@ -122,7 +125,7 @@ bootstrap_target() {
 hint_chroot() {
     echo
     echo
-    echo "You can enter newly created OpenInkpot build environment by issuing"
+    echo "You can enter newly created IPlinux build environment by issuing"
     echo "the following command:"
     echo "    $work_dir/enter"
     echo
@@ -131,7 +134,7 @@ hint_chroot() {
 
 usage() {
     echo "Usage: ${0##*/} [OPTION]... <target-dir>"
-    echo "Bootstrap OpenInkpot build system"
+    echo "Bootstrap IPlinux devenv chroot"
     echo
     cat <<EOF
       -h|--help             display this help and exit
@@ -144,10 +147,10 @@ usage() {
       --debian-mirror=U     debian mirror to use. this should be
                             an URL understandable by debootstrap
                             (defaults to '$debian_mirror')
-      --openinkpot-mirror=U openinkpot mirror to use
-                            (defaults to '$openinkpot_mirror')
-      --openinkpot-suite=S  openinkpot suite to use
-                            (defaults to '$openinkpot_suite')
+      --mirror=U            iplinux mirror to use
+                            (defaults to '$mirror')
+      --suite=S             iplinux suite to use
+                            (defaults to '$suite')
       --target-archs=A,B... target architectures (defaults to '$target_archs')
 
       --root-cmd=C          command to gain root (defaults to '$root_cmd')
@@ -157,7 +160,7 @@ EOF
 
 export LC_ALL=C
 	
-TMP=$(getopt --long help,version,verbose,http-proxy:,ftp-proxy:,debian-mirror:,openinkpot-mirror:,openinkpot-suite:,root:,target-archs:,no-bootstrap-rootfs,root-cmd: -o hvV -- "$@")
+TMP=$(getopt --long help,version,verbose,http-proxy:,ftp-proxy:,debian-mirror:,mirror:,suite:,root:,target-archs:,no-bootstrap-rootfs,root-cmd: -o hvV -- "$@")
 
 if [ $? != 0 ]; then
     exit 1
@@ -166,8 +169,8 @@ fi
 eval set -- "$TMP"
 
 debian_mirror=http://ftp.de.debian.org/debian/
-openinkpot_mirror=http://openinkpot.org/pub/SLIND/
-openinkpot_suite=clydesdale
+mirror=http://ftp.iplinux.org/iplinux/
+suite=asimov
 root_cmd=sudo
 chroot_env=
 target_archs=armel
@@ -179,7 +182,7 @@ while true; do
             exit 0
             ;;
         -V|--version)
-            echo "oi-bootstrap $VERSION"
+            echo "iplinux-bootstrap $VERSION"
             exit 0
             ;;
         -v|--verbose)
@@ -201,12 +204,12 @@ while true; do
             debian_mirror="$2"
             shift 2
             ;;
-        --openinkpot-mirror)
-            openinkpot_mirror="$2"
+        --mirror)
+            mirror="$2"
             shift 2
             ;;
-        --openinkpot-suite)
-            openinkpot_suite="$2"
+        --suite)
+            suite="$2"
             shift 2
             ;;
         --target-archs)
@@ -245,17 +248,13 @@ esac
 root_sh="$root_cmd sh -c"
 
 case "$(hostarch)" in
-    i386)
+    i386|amd64)
         chroot_cmd="chroot"
-        chroot_arch=i386
-        ;;
-    amd64)
-        chroot_cmd="linux32 chroot"
-        chroot_arch=i386
+        chroot_arch=$(hostarch)
         ;;
     *)
-        echo "Unable to determine host architecture. Please file a bug report with output of"
-        echo "* dpkg --print-architecture (if you use Debian-based system)"
+        echo "Unable to detect the host architecture. Please file a bug report with output of"
+        echo "* dpkg --print-architecture (if you use a Debian-based system)"
         echo "* uname -s; uname -m (in all other cases)"
         exit 1
 esac
