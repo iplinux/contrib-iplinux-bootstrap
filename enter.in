@@ -52,4 +52,4 @@ if [ -f /proc/cpuinfo ]; then
     ENV_EXPORT="$ENV_EXPORT DEB_BUILD_OPTIONS=parallel=$NCPUS"
 fi
 
-exec sudo /usr/sbin/chroot "$CHROOT_PATH" su -l -c "$ENV_EXPORT exec \$SHELL $SU_CMD" build
+exec sudo chroot "$CHROOT_PATH" su -l -c "$ENV_EXPORT exec \$SHELL $SU_CMD" build
