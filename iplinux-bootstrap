@@ -37,8 +37,8 @@ hostarch() {
 #
 # Bootstraps chroot and performs configuration enough to run $work_dir/enter
 #
+generate_chroot_name="Generating chroot"
 generate_chroot() {
-    echo "== Generating chroot (1/5) =="
     $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $debian_suite $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
         echo "Failed to bootstrap $debian_suite from $debian_mirror to $work_dir"
@@ -76,9 +76,8 @@ generate_chroot() {
 
 }
 
+populate_chroot_name="Populating chroot"
 populate_chroot() {
-    echo "== Populating chroot (2/5) =="
-
     # -- sources.list --
 
     TMPFILE=$(mktemp)
@@ -99,9 +98,8 @@ populate_chroot() {
     $work_dir/enter sudo apt-get install --yes --force-yes $host_packages
 }
 
+configure_chroot_name="Configuring chroot"
 configure_chroot() {
-    echo "== Configuring chroot (3/5) =="
-
     TMPFILE=$(mktemp)
     echo "SUITE=$suite
 REPO=$mirror
@@ -109,27 +107,17 @@ ROOT_CMD=sudo"  > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
 }
 
+bootstrap_host_name="Bootstraping host"
 bootstrap_host() {
-    echo "== Bootstraping host (4/5) =="
     $work_dir/enter sc-bootstrap-host
 }
 
+bootstrap_target_name="Bootstrapping targets"
 bootstrap_target() {
-    echo "== Bootstrapping targets (5/5) =="
     for arch in "$@"; do
-        echo "--> $arch"
+        echo " --> $arch"
         $work_dir/enter sc-bootstrap-target $arch
     done
-}
-
-hint_chroot() {
-    echo
-    echo
-    echo "You can enter newly created IPlinux build environment by issuing"
-    echo "the following command:"
-    echo "    $work_dir/enter"
-    echo
-    echo
 }
 
 usage() {
@@ -177,7 +165,7 @@ mirror=http://ftp.iplinux.org/iplinux/
 suite=asimov
 root_cmd=sudo
 chroot_env=
-target_archs=armel
+target_archs=
 
 while true; do
     case "$1" in
@@ -280,12 +268,20 @@ echo
 echo "*** If script bails off without \"You can enter newly created...\", then it broke."
 echo
 
-generate_chroot
-populate_chroot
-configure_chroot
-if [ -z "$no_bootstrap_rootfs" ]; then
-    bootstrap_host
-    bootstrap_target $target_archs
-fi
+tasks="generate_chroot populate_chroot"
+tasknum=0
+tasksnum=$(echo $tasks | wc -w)
 
-hint_chroot
+for task in $tasks; do
+    tasknum=$(($tasknum+1))
+    echo " == "$(eval "echo $"$task"_name")" ($tasknum/$tasksnum) == "
+    $task
+done
+
+echo
+echo
+echo "You can enter newly created IPlinux build environment by issuing"
+echo "the following command:"
+echo "    $work_dir/enter"
+echo
+echo
