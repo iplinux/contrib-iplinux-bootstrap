@@ -3,3 +3,7 @@
 Usage: iplinux-bootstrap [OPTIONS] <dir>
 
 Creates new IPlinux devenv chroot.
+
+== License ==
+
+GPLv2 or later.
