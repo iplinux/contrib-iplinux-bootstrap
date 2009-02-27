@@ -2,8 +2,6 @@
 
 VERSION=0.3
 
-DEBIAN_SUITE=lenny
-
 GPG_KEY=http://ftp.iplinux.org/gpgkey
 
 PATH=$PATH:libshell
@@ -41,9 +39,9 @@ hostarch() {
 #
 generate_chroot() {
     echo "== Generating chroot (1/5) =="
-    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $DEBIAN_SUITE $work_dir $debian_mirror"
+    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo --arch=$chroot_arch $debian_suite $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
-        echo "Failed to bootstrap $DEBIAN_SUITE from $debian_mirror to $work_dir"
+        echo "Failed to bootstrap $debian_suite from $debian_mirror to $work_dir"
         exit 1
     fi
 
@@ -84,7 +82,7 @@ populate_chroot() {
     # -- sources.list --
 
     TMPFILE=$(mktemp)
-    echo "deb $debian_mirror $DEBIAN_SUITE main" > $TMPFILE
+    echo "deb $debian_mirror $debian_suite main" > $TMPFILE
     echo "deb $mirror $suite $host_components" >> $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
 
@@ -147,6 +145,9 @@ usage() {
       --debian-mirror=U     debian mirror to use. this should be
                             an URL understandable by debootstrap
                             (defaults to '$debian_mirror')
+      --debian-suite=S      debian suite to use. change only if you
+                            know what are you doing!
+                            (defaults to '$debian_suite')
       --mirror=U            iplinux mirror to use
                             (defaults to '$mirror')
       --suite=S             iplinux suite to use
@@ -169,6 +170,7 @@ fi
 eval set -- "$TMP"
 
 debian_mirror=http://ftp.de.debian.org/debian/
+debian_suite=lenny
 mirror=http://ftp.iplinux.org/iplinux/
 suite=asimov
 root_cmd=sudo
@@ -202,6 +204,10 @@ while true; do
             ;;
         --debian-mirror)
             debian_mirror="$2"
+            shift 2
+            ;;
+        --debian-suite)
+            debian_suite="$2"
             shift 2
             ;;
         --mirror)
