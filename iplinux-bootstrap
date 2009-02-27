@@ -13,7 +13,7 @@ PATH=$PATH:libshell
 #
 
 host_components="host/tools host/cross"
-host_packages="dpkg-cross slind-control"
+host_packages="dpkg-cross dpkg"
 
 # ---
 
