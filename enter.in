@@ -48,7 +48,7 @@ if [ -n "$FTP_PROXY" ]; then
 fi
 
 if [ -f /proc/cpuinfo ]; then
-    NCPUS=$(grep -c '^processor ' /proc/cpuinfo)
+    NCPUS=$(grep -c '^processor' /proc/cpuinfo)
     ENV_EXPORT="$ENV_EXPORT DEB_BUILD_OPTIONS=parallel=$NCPUS"
 fi
 
