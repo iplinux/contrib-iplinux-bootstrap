@@ -88,7 +88,9 @@ populate_chroot() {
 
     # -- GPG key --
 
-    $work_dir/enter sh -c "wget -O- $GPG_KEY | sudo apt-key add -"
+    cp gpgkey $work_dir/tmp
+    $work_dir/enter sudo apt-key add /tmp/gpgkey
+    rm -f $work_dir/tmp/gpgkey
 
     # -- packages --
 
