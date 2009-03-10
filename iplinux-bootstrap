@@ -147,8 +147,8 @@ usage() {
       -V|--version          display version information and exit
       -v|--verbose          don't turn off the output of tools
 
-      --http-proxy=P        use proxy to obtain packages and
-      --ftp-proxy=P         in build system created
+      --http-proxy=P        http proxy to use to obtain packages
+      --ftp-proxy=P         ftp proxy to use to obtain packages
 
       --debian-mirror=U     debian mirror to use. this should be
                             an URL understandable by debootstrap
@@ -267,7 +267,8 @@ case "$(hostarch)" in
         chroot_arch=$(hostarch)
         ;;
     *)
-        echo "Unable to detect the host architecture. Please file a bug report with output of"
+        echo "Unable to detect the host architecture."
+        echo "Please file a bug report with output of"
         echo "* dpkg --print-architecture (if you use a Debian-based system)"
         echo "* uname -s; uname -m (in all other cases)"
         exit 1
@@ -283,7 +284,7 @@ check_ok() {
 }
 
 echo
-echo "*** If script bails off without \"You can enter newly created...\", then it broke."
+echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
 tasks="generate_chroot populate_chroot"
@@ -292,7 +293,7 @@ tasksnum=$(echo $tasks | wc -w)
 
 for task in $tasks; do
     tasknum=$(($tasknum+1))
-    echo " == "$(eval "echo $"$task"_name")" ($tasknum/$tasksnum) == "
+    echo "=>> "$(eval "echo $"$task"_name")" [$tasknum/$tasksnum]"
     $task
 done
 
