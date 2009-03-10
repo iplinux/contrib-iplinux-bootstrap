@@ -31,7 +31,7 @@ PATH=$PATH:libshell
 #
 
 host_components="host/tools host/cross"
-host_packages="dpkg-cross dpkg"
+host_packages="dpkg-cross dpkg cross-shell"
 
 # ---
 
@@ -127,14 +127,14 @@ ROOT_CMD=sudo"  > $TMPFILE
 
 bootstrap_host_name="Bootstraping host"
 bootstrap_host() {
-    $work_dir/enter sc-bootstrap-host
+    $work_dir/enter cross-bootstrap-host
 }
 
 bootstrap_target_name="Bootstrapping targets"
 bootstrap_target() {
-    for arch in "$@"; do
+    for arch in $(echo $target_archs | sed 's/,/ /g'); do
         echo " --> $arch"
-        $work_dir/enter sc-bootstrap-target $arch
+        $work_dir/enter cross-bootstrap-target $arch
     done
 }
 
@@ -287,7 +287,7 @@ echo
 echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
-tasks="generate_chroot populate_chroot"
+tasks="generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
 tasknum=0
 tasksnum=$(echo $tasks | wc -w)
 
