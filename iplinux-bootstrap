@@ -86,8 +86,7 @@ generate_chroot() {
     # -- $work_dir/enter --
 
     TMPFILE=$(mktemp)
-    sed -e "s,@@CHROOT_PATH@@,$work_dir,g" \
-        -e "s,@@HTTP_PROXY@@,$http_proxy,g" \
+    sed -e "s,@@HTTP_PROXY@@,$http_proxy,g" \
         -e "s,@@FTP_PROXY@@,$ftp_proxy,g" < enter.in > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/enter
     $root_cmd chmod +x $work_dir/enter

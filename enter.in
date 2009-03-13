@@ -6,7 +6,12 @@
 # will be invoked.
 #
 
-CHROOT_PATH=@@CHROOT_PATH@@
+CHROOT_PATH=$0
+case "$0" in
+    /*) CHROOT_PATH=$(dirname "$0");;
+    *)  CHROOT_PATH=$(dirname $(pwd)/"$0");;
+esac
+
 HTTP_PROXY=@@HTTP_PROXY@@
 FTP_PROXY=@@FTP_PROXY@@
 
