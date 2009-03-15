@@ -57,7 +57,7 @@ hostarch() {
 #
 generate_chroot_name="Generating chroot"
 generate_chroot() {
-    $root_cmd sh -c "$chroot_env debootstrap/debootstrap --include=sudo,less --arch=$chroot_arch $debian_suite $work_dir $debian_mirror"
+    $root_cmd sh -c "$chroot_env DEBOOTSTRAP_DIR=$(pwd)/debootstrap debootstrap/debootstrap --include=sudo,less --arch=$chroot_arch $debian_suite $work_dir $debian_mirror"
     if [ "$?" != 0 ]; then
         echo "Failed to bootstrap $debian_suite from $debian_mirror to $work_dir"
         exit 1
