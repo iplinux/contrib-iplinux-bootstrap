@@ -102,6 +102,11 @@ populate_chroot() {
     echo "deb $mirror $suite $host_components" >> $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
 
+    # -- no APT recommends by default
+
+    echo "APT { Install-Recommends 'false\'; };" > $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/etc/apt/apt.conf.d/02no-recommends
+
     # -- GPG key --
 
     cp gpgkey $work_dir/tmp
