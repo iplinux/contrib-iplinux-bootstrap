@@ -18,7 +18,7 @@
 # Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-VERSION=0.1.4
+VERSION=0.1.5~pre
 
 GPG_KEY=http://ftp.iplinux.org/gpgkey
 
