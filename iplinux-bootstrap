@@ -52,6 +52,27 @@ hostarch() {
     dpkg --print-architecture 2>/dev/null || guess_hostarch
 }
 
+find_prog() {
+    type "$1" >/dev/null
+}
+
+PROGS="ar"
+
+check_progs_name="Checking prerequisites"
+check_progs() {
+    err=0
+    for prog in $PROGS; do
+        echo -n "$prog: "
+        if find_prog "$prog"; then
+            echo found
+        else
+            echo not found.
+            err=1
+        fi
+    done
+    return $err
+}
+
 #
 # Bootstraps chroot and performs configuration enough to run $work_dir/enter
 #
@@ -291,7 +312,7 @@ echo
 echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
-tasks="generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
+tasks="check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
 tasknum=0
 tasksnum=$(echo $tasks | wc -w)
 
