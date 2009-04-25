@@ -56,7 +56,7 @@ find_prog() {
     type "$1" >/dev/null
 }
 
-PROGS="ar"
+PROGS="ar mktemp sudo wget"
 
 check_progs_name="Checking prerequisites"
 check_progs() {
