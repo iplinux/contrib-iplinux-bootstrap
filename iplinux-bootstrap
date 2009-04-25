@@ -70,6 +70,13 @@ check_progs() {
             err=1
         fi
     done
+
+    #sudo check
+    sudo -K
+    if ! SUDO_ASKPASS=/bin/true sudo -A -l >/dev/null; then
+        echo "sudo: need passwordless sudo!"
+    fi
+
     return $err
 }
 
