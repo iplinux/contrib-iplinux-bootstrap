@@ -1,4 +1,7 @@
 Mikhail Gusarov <dottedmag@dottedmag.net>
 
-iplinux-bootstrap uses parts of libshell library (http://en.altlinux.org/libshell)
+iplinux-bootstrap includes parts of libshell library (http://en.altlinux.org/libshell)
 by Alexey Gladkov <legion@altlinux.org>
+
+iplinux-bootstrap includes debootstrap (http://code.erisian.com.au/Wiki/debootstrap)
+by Anthony Towns <ajt@debian.org>
