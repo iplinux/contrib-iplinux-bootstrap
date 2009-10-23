@@ -66,6 +66,18 @@ check_root() {
 
 PROGS="ar mktemp sudo wget"
 
+check_env_name="Checking environment"
+check_env() {
+    [ -n "$UID" ] || UID=$(id -u)
+
+    if [ $UID -eq 0 ]; then
+        echo "Refusing to work as root. Run under ordinary user with sudo privileges."
+        return 1
+    fi
+
+    return 0
+}
+
 check_progs_name="Checking prerequisites"
 check_progs() {
     err=0
@@ -327,7 +339,7 @@ echo
 echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
-tasks="check_root check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
+tasks="check_env check_root check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
 tasknum=0
 tasksnum=$(echo $tasks | wc -w)
 
