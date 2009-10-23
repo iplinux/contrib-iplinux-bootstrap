@@ -1,8 +1,8 @@
 == iplinux-bootstrap ==
 
-Usage: iplinux-bootstrap [OPTIONS] <dir>
+Usage: iplinux-bootstrap [OPTIONS] <distribution> <dir>
 
-Creates new IPlinux devenv chroot.
+Creates new IPlinux (or OpenInkpot) devenv chroot.
 
 == License ==
 
