@@ -56,8 +56,6 @@ find_prog() {
     type "$1" >/dev/null 2>/dev/null
 }
 
-PROGS="ar mktemp sudo wget"
-
 check_env_name="Checking environment"
 check_env() {
     [ -n "$UID" ] || UID=$(id -u)
@@ -69,6 +67,8 @@ check_env() {
 
     return 0
 }
+
+PROGS="ar mktemp sudo wget"
 
 check_progs_name="Checking prerequisites"
 check_progs() {
