@@ -1,0 +1,6 @@
+# -*- mode:sh -*-
+
+ADD_PKGS=less
+REPO=debian
+SECTIONS=main
+SUITE=lenny

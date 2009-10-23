@@ -18,22 +18,13 @@
 # Street, Fifth Floor, Boston, MA 02110-1301 USA.
 #
 
-VERSION=0.1.5~pre
-
-GPG_KEY=http://ftp.iplinux.org/gpgkey
+VERSION=0.2.0~pre
 
 PATH=$PATH:libshell
 . shell-error
 . shell-getopt
 
-#
-# Probably need to be configurable in future
-#
-
-host_components="host/tools host/cross"
-host_packages="dpkg-cross dpkg cross-shell"
-
-# ---
+# --- Utils ---
 
 # Our little config.guess
 guess_hostarch() {
@@ -56,6 +47,71 @@ find_prog() {
     type "$1" >/dev/null 2>/dev/null
 }
 
+in_list() {
+    LIST="$1"
+    ITEM="$2"
+
+    expr " $LIST " : ".* $ITEM " >/dev/null
+}
+
+car() {
+    echo "$@" | cut -d' ' -f1
+}
+
+cdr() {
+    echo "$@" | cut -d' ' -f2-
+}
+
+# --- Config parsing ---
+
+#
+# Quirks in distribution configs:
+#
+# * _first_ source in distribution is special, as it is used for debootstrap.
+#   - it is expected that it is possible to debootstrap it
+#   - it should provide package 'sudo'
+#   - it should contain /usr/sbin/adduser
+#
+
+parse_repositories() {
+    repositories=$(cd distributions/repositories; find * -maxdepth 0 -type f -printf '%f ')
+
+    for r in $repositories; do
+        . distributions/repositories/$r
+        eval "${r}_URL=\"$DEFAULT_URL\""
+        eval "${r}_DEFAULT_URL=\"$DEFAULT_URL\""
+        eval "${r}_NAME=\"$NAME\""
+        unset DEFAULT_URL NAME
+    done
+}
+
+parse_sources() {
+    sources=$(cd distributions/sources; find * -maxdepth 0 -type f -printf '%f ')
+
+    for s in $sources; do
+        . distributions/sources/$s
+        eval "${s}_ADD_PKGS=\"$ADD_PKGS\""
+        eval "${s}_REPO=\"$REPO\""
+        eval "${s}_SECTIONS=\"$SECTIONS\""
+        eval "${s}_SUITE=\"$SUITE\""
+        unset ADD_PKGS REPO SECTIONS SUITE
+    done
+}
+
+parse_distributions() {
+    distributions=$(cd distributions; find * -maxdepth 0 -type f -printf '%f ')
+
+    for d in $distributions; do
+        . distributions/$d
+        eval "${d}_NAME=\"$NAME\""
+        eval "${d}_SOURCES=\"$SOURCES\""
+        eval "${d}_CROSS_SHELL_SOURCE=\"$CROSS_SHELL_SOURCE\""
+        unset NAME SOURCES CROSS_SHELL_SOURCE
+    done
+}
+
+# --- Bootstrap ---
+
 check_env_name="Checking environment"
 check_env() {
     [ -n "$UID" ] || UID=$(id -u)
@@ -68,7 +124,7 @@ check_env() {
     return 0
 }
 
-PROGS="ar mktemp sudo wget"
+PROGS="ar mktemp sudo"
 
 check_progs_name="Checking prerequisites"
 check_progs() {
@@ -97,9 +153,20 @@ check_progs() {
 #
 generate_chroot_name="Generating chroot"
 generate_chroot() {
-    $root_cmd sh -c "$chroot_env DEBOOTSTRAP_DIR=$(pwd)/debootstrap debootstrap/debootstrap --include=sudo,less --arch=$chroot_arch $debian_suite $work_dir $debian_mirror"
+    distro_name=$(eval echo \${distribution}_NAME)
+
+    src=$(car $(eval echo \$${distribution}_SOURCES))
+    suite=$(eval echo \$${src}_SUITE)
+    sections=$(eval echo \$${src}_SECTIONS)
+    sections=$(echo $sections | sed -e 's/ +/,/g')
+
+    repo=$(eval echo \$${src}_REPO)
+    repo_url=$(eval echo \$${repo}_URL)
+    repo_name=$(eval echo \$${repo}_NAME)
+
+    $root_cmd sh -c "$chroot_env DEBOOTSTRAP_DIR=$(pwd)/debootstrap debootstrap/debootstrap --include=sudo --arch=$chroot_arch --components=$sections $suite $work_dir $repo_url"
     if [ "$?" != 0 ]; then
-        echo "Failed to bootstrap $debian_suite from $debian_mirror to $work_dir"
+        echo "Failed to bootstrap $repo_name from $repo_url to $work_dir"
         exit 1
     fi
 
@@ -112,7 +179,7 @@ generate_chroot() {
 
     [ -n "$UID" ] || UID=`id -u`
 
-    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos 'IPlinux build user' build
+    $root_cmd $chroot_cmd $work_dir /usr/sbin/adduser --home /build --uid $UID --disabled-password --disabled-login --gecos "$src build user" build
 
     # -- sudo --
 
@@ -138,22 +205,37 @@ populate_chroot() {
     # -- sources.list --
 
     TMPFILE=$(mktemp)
-    echo "deb $debian_mirror $debian_suite main" > $TMPFILE
-    echo "deb $mirror $suite $host_components" >> $TMPFILE
+    for s in $(eval echo \$${distribution}_SOURCES); do
+        src_repo=$(eval echo \$${s}_REPO)
+        src_url=$(eval echo \$${src_repo}_URL)
+        src_suite=$(eval echo \$${s}_SUITE)
+        src_sections=$(eval echo \$${s}_SECTIONS)
+        echo "deb $src_url $src_suite $src_sections" >> $TMPFILE
+    done
     $root_cmd mv $TMPFILE $work_dir/etc/apt/sources.list
 
     # -- no APT recommends by default
 
-    echo "APT { Install-Recommends 'false\'; };" > $TMPFILE
+    echo "APT { Install-Recommends 'false'; };" > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/apt/apt.conf.d/02no-recommends
 
     # -- GPG key --
 
-    cp gpgkey $work_dir/tmp
+    for s in $(eval echo \$${distribution}_SOURCES); do
+        keyfile=distributions/keys/$s
+        [ ! -f $keyfile ] || cat $keyfile >> $work_dir/tmp/gpgkey
+    done
+
     $work_dir/enter sudo apt-key add /tmp/gpgkey
     rm -f $work_dir/tmp/gpgkey
 
     # -- packages --
+
+    host_packages=''
+
+    for s in $(eval echo \$${distribution}_SOURCES); do
+        host_packages="$host_packages "$(eval echo \$${s}_ADD_PKGS)
+    done
 
     $work_dir/enter sudo apt-get update
     $work_dir/enter sudo apt-get dist-upgrade --yes --force-yes
@@ -162,9 +244,14 @@ populate_chroot() {
 
 configure_chroot_name="Configuring chroot"
 configure_chroot() {
+    src=$(eval echo \$${distribution}_CROSS_SHELL_SOURCE)
+    repo=$(eval echo \$${src}_REPO)
+    repo_url=$(eval echo \$${repo}_URL)
+    suite=$(eval echo \$${src}_SUITE)
+
     TMPFILE=$(mktemp)
     echo "SUITE=$suite
-REPO=$mirror
+REPO=$repo_url
 ROOT_CMD=sudo"  > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
 }
@@ -183,7 +270,7 @@ bootstrap_target() {
 }
 
 usage() {
-    echo "Usage: ${0##*/} [OPTION]... <target-dir>"
+    echo "Usage: ${0##*/} [OPTION]... <distribution> <target-dir>"
     echo "Bootstrap IPlinux devenv chroot"
     echo
     cat <<EOF
@@ -194,26 +281,39 @@ usage() {
       --http-proxy=P        http proxy to use to obtain packages
       --ftp-proxy=P         ftp proxy to use to obtain packages
 
-      --debian-mirror=U     debian mirror to use. this should be
-                            an URL understandable by debootstrap
-                            (defaults to '$debian_mirror')
-      --debian-suite=S      debian suite to use. change only if you
-                            know what are you doing!
-                            (defaults to '$debian_suite')
-      --mirror=U            iplinux mirror to use
-                            (defaults to '$mirror')
-      --suite=S             iplinux suite to use
-                            (defaults to '$suite')
-      --target-archs=A,B... target architectures (defaults to '$target_archs')
-
       --root-cmd=C          command to gain root (defaults to '$root_cmd')
 
+      --target-archs=A,B... target architectures (defaults to '$target_archs')
+
+EOF
+
+    for r in $repositories; do
+        echo "      --${r}-mirror=U"
+
+        url=$(eval echo \$${r}_DEFAULT_URL)
+        name=$(eval echo \$${r}_NAME)
+        echo "                            URL of $name repository"
+        echo "                            (defaults to $url)"
+    done
+    cat <<EOF
+
+List of available distributions: $distributions
 EOF
 }
 
 export LC_ALL=C
+
+parse_repositories
+parse_sources
+parse_distributions
+
+cmdline_options="help,version,verbose,http-proxy:,ftp-proxy:,root:,target-archs:,no-bootstrap-rootfs,root-cmd:"
+
+for r in $repositories; do
+    cmdline_options="$cmdline_options,$r-mirror:"
+done
 	
-TMP=$(getopt --long help,version,verbose,http-proxy:,ftp-proxy:,debian-mirror:,mirror:,suite:,root:,target-archs:,no-bootstrap-rootfs,root-cmd: -o hvV -- "$@")
+TMP=$(getopt --long $cmdline_options -o hvV -- "$@")
 
 if [ $? != 0 ]; then
     exit 1
@@ -221,10 +321,6 @@ fi
 
 eval set -- "$TMP"
 
-debian_mirror=http://ftp.de.debian.org/debian/
-debian_suite=lenny
-mirror=http://ftp.iplinux.org/iplinux/
-suite=asimov
 root_cmd=sudo
 chroot_env=
 target_archs=
@@ -254,20 +350,10 @@ while true; do
             chroot_env="$chroot_env ftp_proxy=$2"
             shift 2
             ;;
-        --debian-mirror)
-            debian_mirror="$2"
-            shift 2
-            ;;
-        --debian-suite)
-            debian_suite="$2"
-            shift 2
-            ;;
-        --mirror)
-            mirror="$2"
-            shift 2
-            ;;
-        --suite)
-            suite="$2"
+        --*-mirror)
+            r=${1#--}
+            r=${r%-mirror}
+            eval "${r}_URL=\"$2\""
             shift 2
             ;;
         --target-archs)
@@ -293,14 +379,16 @@ while true; do
     esac
 done
 
-if [ $# != 1 ]; then
+if [ $# != 2 ]; then
     usage
     exit 0
 fi
 
-case "$1" in
-    /*) work_dir="$1";;
-    *)  work_dir=$(pwd)/$1;;
+distribution="$1"
+
+case "$2" in
+    /*) work_dir="$2";;
+    *)  work_dir=$(pwd)/$2;;
 esac
 
 root_sh="$root_cmd sh -c"
@@ -341,9 +429,11 @@ for task in $tasks; do
     $task
 done
 
+distro_name=$(eval echo \$${distribution}_NAME)
+
 echo
 echo
-echo "You can enter newly created IPlinux build environment by issuing"
+echo "You can enter newly created $distro_name build environment by issuing"
 echo "the following command:"
 echo "    $work_dir/enter"
 echo

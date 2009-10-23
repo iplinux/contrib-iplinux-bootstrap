@@ -1,0 +1,5 @@
+# -*- mode: sh -*-
+
+NAME="OpenInkpot"
+SOURCES="debian_lenny iplinux_asimov openinkpot_asimov"
+CROSS_SHELL_SOURCE=iplinux_asimov
