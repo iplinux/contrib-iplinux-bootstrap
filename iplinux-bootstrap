@@ -114,6 +114,11 @@ parse_distributions() {
 
 check_env_name="Checking environment"
 check_env() {
+    if [ -e $work_dir ]; then
+        echo "$work_dir already exists. Remove it before proceeding."
+        return 1
+    fi
+
     [ -n "$UID" ] || UID=$(id -u)
 
     if [ $UID -eq 0 ]; then
