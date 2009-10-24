@@ -23,4 +23,4 @@ git archive --prefix="$DIR"/ HEAD \
     | bzip2 > "$DIST"
 
 rsync "$DIST" "openinkpot.org:$WWW_PATH"
-ssh openinkpot.org ln -sf "$WWW_PATH/iplinux-bootstrap-LATEST.tar.bz2" "$DIST"
+ssh openinkpot.org ln -sf "$DIST" "$WWW_PATH/iplinux-bootstrap-LATEST.tar.bz2"
