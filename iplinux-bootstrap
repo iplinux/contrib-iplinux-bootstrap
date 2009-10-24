@@ -268,19 +268,6 @@ ROOT_CMD=sudo"  > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
 }
 
-bootstrap_host_name="Bootstraping host"
-bootstrap_host() {
-    $work_dir/.enter.real cross-bootstrap-host
-}
-
-bootstrap_target_name="Bootstrapping targets"
-bootstrap_target() {
-    for arch in $(echo $target_archs | sed 's/,/ /g'); do
-        echo " --> $arch"
-        $work_dir/.enter.real cross-bootstrap-target $arch
-    done
-}
-
 enable_chroot_name="Enabling chroot"
 enable_chroot() {
     $root_cmd rm $work_dir/enter
@@ -300,8 +287,6 @@ usage() {
       --ftp-proxy=P         ftp proxy to use to obtain packages
 
       --root-cmd=C          command to gain root (defaults to '$root_cmd')
-
-      --target-archs=A,B... target architectures (defaults to '$target_archs')
 
 EOF
 
@@ -325,7 +310,7 @@ parse_repositories
 parse_sources
 parse_distributions
 
-cmdline_options="help,version,verbose,http-proxy:,ftp-proxy:,root:,target-archs:,no-bootstrap-rootfs,root-cmd:"
+cmdline_options="help,version,verbose,http-proxy:,ftp-proxy:,root:,root-cmd:"
 
 for r in $repositories; do
     cmdline_options="$cmdline_options,$r-mirror:"
@@ -341,7 +326,6 @@ eval set -- "$TMP"
 
 root_cmd=sudo
 chroot_env=
-target_archs=
 
 while true; do
     case "$1" in
@@ -372,10 +356,6 @@ while true; do
             r=${1#--}
             r=${r%-mirror}
             eval "${r}_URL=\"$2\""
-            shift 2
-            ;;
-        --target-archs)
-            target_archs="$2"
             shift 2
             ;;
         --no-bootstrap-rootfs)
@@ -437,7 +417,7 @@ echo
 echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
-tasks="check_env check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target enable_chroot"
+tasks="check_env check_progs generate_chroot populate_chroot configure_chroot enable_chroot"
 tasknum=0
 tasksnum=$(echo $tasks | wc -w)
 
