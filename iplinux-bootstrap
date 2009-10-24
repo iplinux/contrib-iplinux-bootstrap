@@ -200,9 +200,16 @@ generate_chroot() {
     TMPFILE=$(mktemp)
     sed -e "s,@@HTTP_PROXY@@,$http_proxy,g" \
         -e "s,@@FTP_PROXY@@,$ftp_proxy,g" < enter.in > $TMPFILE
+    $root_cmd mv $TMPFILE $work_dir/.enter.real
+    $root_cmd chmod +x $work_dir/.enter.real
+
+    TMPFILE=$(mktemp)
+    echo '#!/bin/sh
+echo "Chroot generation did not finish!"
+echo "Do not try to use this chroot, remove it and build another."
+exit 1' > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/enter
     $root_cmd chmod +x $work_dir/enter
-
 }
 
 populate_chroot_name="Populating chroot"
@@ -231,7 +238,7 @@ populate_chroot() {
         [ ! -f $keyfile ] || cat $keyfile >> $work_dir/tmp/gpgkey
     done
 
-    $work_dir/enter sudo apt-key add /tmp/gpgkey
+    $work_dir/.enter.real sudo apt-key add /tmp/gpgkey
     rm -f $work_dir/tmp/gpgkey
 
     # -- packages --
@@ -242,9 +249,9 @@ populate_chroot() {
         host_packages="$host_packages "$(eval echo \$${s}_ADD_PKGS)
     done
 
-    $work_dir/enter sudo apt-get update
-    $work_dir/enter sudo apt-get dist-upgrade --yes --force-yes
-    $work_dir/enter sudo apt-get install --yes --force-yes $host_packages
+    $work_dir/.enter.real sudo apt-get update
+    $work_dir/.enter.real sudo apt-get dist-upgrade --yes --force-yes
+    $work_dir/.enter.real sudo apt-get install --yes --force-yes $host_packages
 }
 
 configure_chroot_name="Configuring chroot"
@@ -263,15 +270,21 @@ ROOT_CMD=sudo"  > $TMPFILE
 
 bootstrap_host_name="Bootstraping host"
 bootstrap_host() {
-    $work_dir/enter cross-bootstrap-host
+    $work_dir/.enter.real cross-bootstrap-host
 }
 
 bootstrap_target_name="Bootstrapping targets"
 bootstrap_target() {
     for arch in $(echo $target_archs | sed 's/,/ /g'); do
         echo " --> $arch"
-        $work_dir/enter cross-bootstrap-target $arch
+        $work_dir/.enter.real cross-bootstrap-target $arch
     done
+}
+
+enable_chroot_name="Enabling chroot"
+enable_chroot() {
+    $root_cmd rm $work_dir/enter
+    $root_cmd mv $work_dir/.enter.real $work_dir/enter
 }
 
 usage() {
@@ -424,7 +437,7 @@ echo
 echo "** If script stops without \"You can enter newly created...\", then it broke."
 echo
 
-tasks="check_env check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target"
+tasks="check_env check_progs generate_chroot populate_chroot configure_chroot bootstrap_host bootstrap_target enable_chroot"
 tasknum=0
 tasksnum=$(echo $tasks | wc -w)
 
