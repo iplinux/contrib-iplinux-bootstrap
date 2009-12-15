@@ -189,7 +189,7 @@ generate_chroot() {
     # -- sudo --
 
     TMPFILE=$(mktemp)
-    echo "Defaults env_keep+=http_proxy, env_keep+=ftp_proxy" > $TMPFILE
+    echo "Defaults env_keep+=http_proxy, env_keep+=ftp_proxy, env_keep+=\"DEB_*\"" > $TMPFILE
     echo "build ALL=(ALL) NOPASSWD:ALL" >> $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/sudoers
     $root_cmd chown root:root $work_dir/etc/sudoers
