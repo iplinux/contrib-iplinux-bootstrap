@@ -37,7 +37,7 @@ quote_args() {
 
 if [ "$#" -eq 0 ]; then
     # Interactive shell
-    SU_CMD=-i
+    SU_CMD="-i -l"
 else
     # Single command. Double quoting to pass through two su(1) invocations. Blergh.
     S=$(quote_args "$@")
