@@ -266,6 +266,12 @@ configure_chroot() {
 REPO=$repo_url
 ROOT_CMD=sudo"  > $TMPFILE
     $root_cmd mv $TMPFILE $work_dir/etc/cross-shell/config
+
+    # -- Prompt --
+
+    cp $work_dir/build/.profile $work_dir/tmp/profile
+    echo "export PS1=\"<devenv: \w>\$ \"" >> $work_dir/tmp/profile
+    $work_dir/.enter.real mv -f /tmp/profile /build/.profile
 }
 
 enable_chroot_name="Enabling chroot"
