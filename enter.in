@@ -25,6 +25,7 @@ quote_shell() {
 	fi
 	printf %s "$out"
     #` # Hey, Emacs, your syntax highlighter is wrooong!
+    #'` # You too, gedit!
 }
 
 quote_args() {
