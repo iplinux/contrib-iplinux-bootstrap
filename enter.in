@@ -36,6 +36,48 @@ quote_args() {
     echo
 }
 
+# A space-separated list of mounted repositories
+mounted_repos=
+
+# Unmount all mounted repositories
+unmount_repos() {
+    
+    for _mounted_repo in $mounted_repos; do
+    
+        # If current repo directory is actually mounted
+        if fgrep -q "$_mounted_repo" < /etc/mtab; then
+            sudo umount "$_mounted_repo"
+        fi
+        # Remove the repo directory and any empty parent directories
+        sudo rmdir -p "$_mounted_repo" 2> /dev/null || :
+    done
+    exit
+}
+
+# Mount a repository directory
+mount_repo() {
+    _chroot_path=$1
+    _local_rep=$2
+    
+    # Strip any meaningless trailing dots and slashes from the chroot path
+    _trimmed_chroot_path=$(echo "$_chroot_path" | sed 's|/\.\?$||')
+    
+    # If the local repo directory isn't already mounted
+    if ! fgrep -q "$_trimmed_chroot_path$_local_rep" < /etc/mtab; then
+        
+        # Make a mount dir within chroot and mount the local repo dir to it
+        sudo mkdir -p "$_trimmed_chroot_path$_local_rep"
+        sudo mount --bind "$_local_rep" "$_trimmed_chroot_path$_local_rep"
+        
+        # Add local repo to list of mounted repos
+        mounted_repos=`echo "$mounted_repos $_trimmed_chroot_path$_local_rep"`
+        
+        # Call unmount_repos to clean up the local repos when the script is 
+        # exited or interrupted
+        trap unmount_repos TERM INT EXIT
+    fi
+}
+
 if [ "$#" -eq 0 ]; then
     # Interactive shell
     SU_CMD="-i -l"
@@ -58,4 +100,23 @@ if [ -f /proc/cpuinfo ]; then
     ENV_EXPORT="$ENV_EXPORT DEB_BUILD_OPTIONS=parallel=$NCPUS"
 fi
 
-exec sudo chroot "$CHROOT_PATH" su -l -c "$ENV_EXPORT exec \$SHELL $SU_CMD" build
+# Mount every local repository in the chroot's sources.list file that doesn't 
+# exist in the chroot file system.
+
+# All the local repositories mentioned in chroot's sources.list file
+local_repos=$(egrep -o '(file:[^[:space:]]+)' < "$CHROOT_PATH/etc/apt/sources.list" | sed 's/file://')
+
+for local_repo in $local_repos; do
+    # If the directory doesn't exist in the chroot file system
+    if [ ! -e "$CHROOT_PATH$local_repo" ]; then
+        
+        # If the directory does exist in the exterior file system
+        if [ -d "$local_repo" ]; then
+            
+            # Make a mount dir and mount the exterior repository dir to it
+            mount_repo "$CHROOT_PATH" "$local_repo"
+        fi
+    fi
+done
+
+sudo chroot "$CHROOT_PATH" su -l -c "$ENV_EXPORT exec \$SHELL $SU_CMD" build
