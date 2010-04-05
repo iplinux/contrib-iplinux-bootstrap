@@ -43,11 +43,8 @@ mounted_repos=
 unmount_repos() {
     
     for _mounted_repo in $mounted_repos; do
-    
-        # If current repo directory is actually mounted
-        if fgrep -q "$_mounted_repo" < /etc/mtab; then
-            sudo umount "$_mounted_repo"
-        fi
+        # Unmount repository no matter what.    
+        sudo umount "$_mounted_repo" 2> /dev/null || :
         # Remove the repo directory and any empty parent directories
         sudo rmdir -p "$_mounted_repo" 2> /dev/null || :
     done
