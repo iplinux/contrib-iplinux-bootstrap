@@ -1,0 +1,5 @@
+# -*- mode: sh -*-
+
+NAME="IPlinux"
+SOURCES="debian_lenny iplinux_bradbury"
+CROSS_SHELL_SOURCE=iplinux_bradbury

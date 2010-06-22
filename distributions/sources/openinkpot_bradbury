@@ -1,0 +1,5 @@
+# -*- mode:sh -*-
+
+REPO=openinkpot
+SECTIONS="host/tools host/cross"
+SUITE=bradbury

@@ -1,0 +1,5 @@
+# -*- mode: sh -*-
+
+NAME="OpenInkpot"
+SOURCES="debian_lenny iplinux_bradbury openinkpot_bradbury"
+CROSS_SHELL_SOURCE=iplinux_bradbury

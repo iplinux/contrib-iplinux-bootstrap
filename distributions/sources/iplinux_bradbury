@@ -1,0 +1,6 @@
+# -*- mode: sh -*-
+
+ADD_PKGS="dpkg-cross cross-shell"
+REPO=iplinux
+SECTIONS="host/tools host/cross"
+SUITE=bradbury
