@@ -390,6 +390,11 @@ fi
 
 distribution="$1"
 
+if ! in_list "$distributions" "$distribution"; then
+  echo "Unknown distribution: $distribution"
+  exit 1
+fi
+
 case "$2" in
     /*) work_dir="$2";;
     *)  work_dir=$(pwd)/$2;;
