@@ -152,6 +152,7 @@ check_progs() {
     fi
     if ! env $SUDO_ENV sudo $SUDO_ARG -l >/dev/null; then
         echo "sudo: need passwordless sudo!"
+        err=1
     fi
 
     return $err
