@@ -146,7 +146,11 @@ check_progs() {
 
     #sudo check
     sudo -K
-    if ! SUDO_ASKPASS=/bin/true sudo -A -l >/dev/null; then
+    if sudo -h 2>&1 | grep -q -- '\[-A'; then
+        SUDO_ENV=SUDO_ASKPASS=/bin/true
+        SUDO_ARG=-A
+    fi
+    if ! env $SUDO_ENV sudo $SUDO_ARG -l >/dev/null; then
         echo "sudo: need passwordless sudo!"
     fi
 
