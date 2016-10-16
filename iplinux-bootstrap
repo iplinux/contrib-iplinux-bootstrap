@@ -174,7 +174,7 @@ generate_chroot() {
     repo_url=$(eval echo \$${repo}_URL)
     repo_name=$(eval echo \$${repo}_NAME)
 
-    $root_cmd sh -c "$chroot_env DEBOOTSTRAP_DIR=$(pwd)/debootstrap debootstrap/debootstrap --include=sudo --arch=$chroot_arch --components=$sections $suite $work_dir $repo_url"
+    $root_cmd sh -c "$chroot_env DEBOOTSTRAP_DIR=$(pwd)/debootstrap debootstrap/debootstrap --include=sudo,apt-transport-https --arch=$chroot_arch --components=$sections $suite $work_dir $repo_url"
     if [ "$?" != 0 ]; then
         echo "Failed to bootstrap $repo_name from $repo_url to $work_dir"
         exit 1
