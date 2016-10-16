@@ -1,4 +1,4 @@
 # -*- mode: sh -*-
 
-DEFAULT_URL=http://openinkpot.org/pub/oi/
+DEFAULT_URL=https://openinkpot.org/pub/oi/
 NAME=OpenInkpot
