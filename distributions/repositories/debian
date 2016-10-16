@@ -1,4 +1,4 @@
 # -*- mode: sh -*-
 
-DEFAULT_URL=http://ftp.de.debian.org/debian/
+DEFAULT_URL=http://archive.debian.org/debian/
 NAME=Debian
