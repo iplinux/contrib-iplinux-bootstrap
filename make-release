@@ -10,7 +10,7 @@ DIST="$DIR.tar.bz2"
 
 WWW_PATH="/srv/www/ftp.iplinux.org/htdocs/contrib/iplinux-bootstrap"
 
-if ! git status | grep -q 'nothing to commit (working directory clean)'; then
+if [ -n "$(git status --porcelain)" ]; then
     git status
     exit 1
 fi
