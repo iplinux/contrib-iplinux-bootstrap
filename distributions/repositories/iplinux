@@ -1,4 +1,4 @@
 # -*- mode: sh -*-
 
-DEFAULT_URL=https://ftp.iplinux.org/iplinux/
+DEFAULT_URL=http://ftp.iplinux.org/iplinux/
 NAME=IPlinux
